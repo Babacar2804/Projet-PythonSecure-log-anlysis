@@ -87,7 +87,11 @@ Il est construit automatiquement à partir des résultats de l'analyse :
 ```bash
 python main.py analyze                       # produit output/
 python docs/rapport/build_report.py          # -> docs/rapport/Rapport_projet_logs.pdf
+python docs/rapport/build_synthese.py        # -> docs/rapport/Synthese_soutenance.pdf
 ```
+
+- `Rapport_projet_logs.pdf` : rapport complet (17 pages).
+- `Synthese_soutenance.pdf` : synthèse visuelle de 7 pages pour l'oral.
 
 Les noms de l'équipe, l'enseignant et l'URL GitHub se règlent en haut de
 `docs/rapport/build_report.py` (variables `TEAM`, `TEACHER`, `GITHUB_URL`).
