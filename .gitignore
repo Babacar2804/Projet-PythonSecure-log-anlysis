@@ -1,0 +1,13 @@
+# Environnement virtuel
+.venv/
+venv/
+
+# Données générées (plusieurs Go : on ne les met JAMAIS dans Git)
+data/raw/
+data/demo/
+output/
+docs/rapport/_figures/
+
+# Python
+__pycache__/
+*.pyc
