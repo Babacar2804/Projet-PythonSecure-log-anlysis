@@ -76,20 +76,30 @@ def follow_log_file(path: Path, poll_interval: float = 0.2,
 
 
 def with_progress(lines: Iterable[str],
-                  every: int = 1_000_000) -> Iterator[str]:
+                  every: int = 100_000) -> Iterator[str]:
     """Laisse passer les lignes telles quelles en affichant l'avancement.
 
     C'est un exemple d'étape "transparente" dans une chaîne de générateurs :
     elle ne modifie rien, elle observe le flux.
     """
     started = time.perf_counter()
+    last_progress_at = started
     count = 0
+    last_reported = 0
     for count, line in enumerate(lines, start=1):
-        if count % every == 0:
-            elapsed = time.perf_counter() - started
-            print(f"\r[ingestion] {count:,} lignes lues "
-                  f"({count / elapsed:,.0f} lignes/s)", end="",
+        now = time.perf_counter()
+        elapsed = now - started
+        if count % every == 0 or now - last_progress_at >= 2:
+            print(f"\r[analyse] {count:,} lignes lues | "
+                  f"{count / elapsed:,.0f} lignes/s | {elapsed:.1f} s",
+                  end="",
                   file=sys.stderr, flush=True)
+            last_reported = count
+            last_progress_at = now
         yield line
-    if count >= every:
+    if count != last_reported:
+        elapsed = time.perf_counter() - started
+        print(f"\r[analyse] {count:,} lignes lues | terminé en "
+              f"{elapsed:.1f} s", file=sys.stderr, flush=True)
+    else:
         print(file=sys.stderr)

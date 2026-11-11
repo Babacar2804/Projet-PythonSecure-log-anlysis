@@ -32,6 +32,9 @@ python main.py live --duration 60            # analyse en temps réel
 python main.py --help                        # toutes les options
 ```
 
+Pendant la démo, le terminal affiche l'avancement de la génération fichier
+par fichier, puis le nombre de lignes analysées, la vitesse et la durée.
+
 Durées mesurées (8 cœurs) : génération de 12 Go (69 M de lignes) en 75 s ;
 analyse à ≈ 72 000 lignes/s, soit environ 17 min pour 12 Go (un seul processus).
 

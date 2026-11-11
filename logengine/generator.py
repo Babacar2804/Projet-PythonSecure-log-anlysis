@@ -34,7 +34,7 @@ import re
 import shutil
 import threading
 import time
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from itertools import accumulate
 from operator import itemgetter
@@ -1159,11 +1159,16 @@ def generate_dataset(out_dir: Path, size_gb: float, files: int, days: int,
     started = time.perf_counter()
     total_bytes = total_lines = 0
     with ProcessPoolExecutor(max_workers=workers) as executor:
-        for path, size, lines, seconds in executor.map(generate_file, jobs):
+        futures = [executor.submit(generate_file, job) for job in jobs]
+        for completed, future in enumerate(as_completed(futures), start=1):
+            path, size, lines, seconds = future.result()
             total_bytes += size
             total_lines += lines
-            print(f"  {Path(path).name} : {size / 1024 ** 2:,.0f} Mo, "
-                  f"{lines:,} lignes en {seconds:.0f} s")
+            print(f"[générateur] fichier {completed}/{len(jobs)} terminé : "
+                  f"{Path(path).name}, {size / 1024 ** 2:,.0f} Mo, "
+                  f"{lines:,} lignes en {seconds:.0f} s "
+                  f"({total_bytes / 1024 ** 2:,.0f} Mo cumulés)",
+                  flush=True)
     elapsed = time.perf_counter() - started
     print(f"[générateur] terminé : {total_bytes / 1024 ** 3:.2f} Go, "
           f"{total_lines:,} lignes en {elapsed:.0f} s")
