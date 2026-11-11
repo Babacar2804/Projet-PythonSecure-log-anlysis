@@ -91,7 +91,9 @@ python main.py analyze                       # produit output/
 python docs/rapport/build_synthese.py        # -> docs/rapport/Synthese_soutenance.pdf
 ```
 
-`Synthese_soutenance.pdf` est le rapport de 7 pages présenté à l'oral.
+`Synthese_soutenance.pdf` est le support de soutenance (11 pages) : une
+ouverture, deux pages par module (ce qu'on présente, puis les résultats et
+les questions probables du jury) et une conclusion.
 Une version détaillée peut aussi être générée localement avec
 `python docs/rapport/build_report.py` (elle n'est pas versionnée).
 

@@ -12,7 +12,6 @@ après une nouvelle analyse met tout le rapport à jour.
 import argparse
 import csv
 import json
-from datetime import date
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -44,6 +43,7 @@ GITHUB_URL = "https://github.com/Babacar2804/Projet-PythonSecure-log-anlysis"
 # Mesures faites avec `python main.py analyze --trace-memory --limit N`
 MEMORY_MEASURES = [(290_699, 12.5), (2_000_000, 18.9)]
 TESTS_COUNT = 75        # résultat de `python -m pytest`
+SOUTENANCE_DATE = "12/11/2026"
 # ---------------------------------------------------------------------------
 
 INK = colors.HexColor("#0b0b0b")
@@ -349,7 +349,7 @@ def cover(story: list, report: dict) -> None:
         Spacer(1, 0.8 * cm),
         Paragraph(f"{SCHOOL} · {TEACHER}", STYLES["cover"]),
         Paragraph(f"Dépôt : {escape(GITHUB_URL)}", STYLES["cover"]),
-        Paragraph(date.today().strftime("%d/%m/%Y"), STYLES["cover"]),
+        Paragraph(f"Soutenance du {SOUTENANCE_DATE}", STYLES["cover"]),
         PageBreak(),
     ]
 
@@ -417,11 +417,13 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
         h2("2.1 Environnement virtuel et dépendances"),
         p("Le projet s'exécute dans un environnement virtuel <font name='%s'>"
           "venv</font> isolé. Le fichier <font name='%s'>requirements.txt"
-          "</font> est généré par <font name='%s'>pip freeze</font> : il "
-          "permet de reconstruire exactement le même environnement. Le moteur "
-          "lui-même n'utilise que la bibliothèque standard ; matplotlib sert "
-          "aux graphiques, reportlab à produire ce rapport, pytest et mypy "
-          "à vérifier le code." % (MONO, MONO, MONO)),
+          "</font> liste les dépendances directes avec des plages de "
+          "versions (compatibles Python 3.10 et plus) : <font name='%s'>"
+          "pip install -r requirements.txt</font> reconstruit "
+          "l'environnement. Le moteur lui-même n'utilise que la bibliothèque "
+          "standard ; matplotlib sert aux graphiques, reportlab à produire "
+          "ce rapport, pytest et mypy à vérifier le code." %
+          (MONO, MONO, MONO)),
         code("python -m venv .venv\n"
              ".venv\\Scripts\\activate          # Windows\n"
              "pip install -r requirements.txt\n\n"
