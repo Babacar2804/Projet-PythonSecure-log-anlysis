@@ -1,5 +1,10 @@
-"""Construit le support de soutenance (11 pages) : on peut présenter sans
-notes, tout ce qu'il faut dire est sur le document.
+"""Construit deux PDF de 11 pages avec la même mise en page :
+
+- Synthese_soutenance.pdf : support d'oral pour l'équipe (on peut présenter
+  sans notes, tout ce qu'il faut dire est sur le document) ;
+- Rapport_final.pdf : la même chose rédigée pour le professeur (pas de
+  consignes d'oral, les « questions du jury » deviennent nos choix
+  techniques justifiés).
 
 Organisation : une couverture, une page d'ouverture, puis DEUX pages par
 module (page A « ce qu'on présente », page B « ce que ça donne » avec les
@@ -61,6 +66,31 @@ HEX = {"ink": "#1B1F3B", "orange": "#FF7A3D", "teal": "#12B5A6",
        "grid": "#E4E2DA", "paper": "#FFFDF8"}
 # Une couleur par module, la même partout (schéma, pastilles, encadrés)
 MODULE_COLORS = {1: TEAL, 2: ORANGE, 3: YELLOW, 4: CORAL}
+
+# Deux versions du même document : le support d'oral (pour l'équipe) et le
+# rapport final (pour le professeur). Seules quelques formulations changent.
+PROF = False
+PROF_TEXT = {
+    "Ce qu'on présente, dans l'ordre": "Notre réalisation, étape par étape",
+    "QUESTIONS PROBABLES DU JURY": "NOS CHOIX TECHNIQUES, JUSTIFIÉS",
+    "Ouverture": "Introduction",
+    "AU PROGRAMME": "SOMMAIRE",
+    "Qualité, barème et démo": "Qualité et conformité au barème",
+    "Chaque critère du barème et l'endroit où le montrer":
+        "Chaque critère du barème et l'endroit où il est traité dans le code",
+    "DÉMO": "LANCER",
+    "PROJET FINAL · PYTHON AVANCÉ · ING3":
+        "RAPPORT FINAL · PYTHON AVANCÉ · ING3",
+}
+
+
+def adapt(text: str) -> str:
+    """Reformule un texte du support d'oral pour la version professeur."""
+    if not PROF:
+        return text
+    text = PROF_TEXT.get(text, text)
+    return (text.replace("ce qu'on présente", "réalisation")
+            .replace("Le code à montrer", "Extrait de code"))
 
 
 # ------------------------------------------------------------------ polices
@@ -134,6 +164,7 @@ def para_height(text: str, width: float, st: ParagraphStyle) -> float:
 def header(c: Canvas, badge: str, title: str, kicker: str,
            color: Color = ORANGE, label: str = "") -> float:
     """Bandeau de page ; renvoie l'ordonnée où commence le contenu."""
+    title, kicker, label = adapt(title), adapt(kicker), adapt(label)
     c.setFillColor(PAPER)
     c.rect(0, 0, W, H, fill=1, stroke=0)
     c.setFillColor(INK)
@@ -162,8 +193,9 @@ def header(c: Canvas, badge: str, title: str, kicker: str,
 def footer(c: Canvas, page: int) -> None:
     c.setFillColor(MUTED)
     c.setFont(F["Body"], 8)
+    kind = "rapport final" if PROF else "support de soutenance"
     c.drawString(M, 22, "Engine d'analyse de logs sécurisé · Python ING3 · "
-                 f"soutenance du {SOUTENANCE_DATE}")
+                 f"{kind} · {SOUTENANCE_DATE}")
     c.setFillColor(INK)
     c.roundRect(W - M - 50, 15, 50, 18, 9, fill=1, stroke=0)
     c.setFillColor(white)
@@ -177,7 +209,7 @@ def subtitle(c: Canvas, text: str, x: float, top: float,
     c.rect(x, top - 13, 4, 14, fill=1, stroke=0)
     c.setFillColor(INK)
     c.setFont(F["Head"], 13.5)
-    c.drawString(x + 11, top - 11, text)
+    c.drawString(x + 11, top - 11, adapt(text))
     return top - 22
 
 
@@ -328,14 +360,14 @@ def questions(c: Canvas, items: list[tuple[str, str]], top: float,
     c.roundRect(x, top - h, width, h, 10, fill=1, stroke=0)
     c.setFillColor(color)
     c.setFont(F["Head"], 11)
-    c.drawString(x + 16, top - 18, "QUESTIONS PROBABLES DU JURY")
+    c.drawString(x + 16, top - 18, adapt("QUESTIONS PROBABLES DU JURY"))
     y = top - 30
     for (question, answer), (hq, ha) in zip(items, blocks):
         c.setFillColor(color)
         c.roundRect(x + 14, y - 13, 20, 14, 4, fill=1, stroke=0)
         c.setFillColor(INK if color == YELLOW else white)
         c.setFont(F["Head"], 9)
-        c.drawCentredString(x + 24, y - 9.5, "Q")
+        c.drawCentredString(x + 24, y - 9.5, "?" if PROF else "Q")
         para(c, question, x + 42, y, inner, style(9.4, "Bold", white, 12.4))
         para(c, answer, x + 42, y - hq - 1, inner,
              style(9.0, color=HexColor("#C9CCE6"), leading=12.2))
@@ -344,7 +376,12 @@ def questions(c: Canvas, items: list[tuple[str, str]], top: float,
 
 
 def transition(c: Canvas, text: str, color: Color) -> None:
-    """Bandeau du bas : la phrase qui fait le lien avec la partie suivante."""
+    """Bandeau du bas : la phrase qui fait le lien avec la partie suivante.
+
+    Uniquement dans le support d'oral : c'est une aide pour l'orateur.
+    """
+    if PROF:
+        return
     c.setFillColor(TINTS[color])
     c.roundRect(M, 44, W - 2 * M, 30, 15, fill=1, stroke=0)
     c.setFillColor(color if color != YELLOW else INK)
@@ -566,7 +603,8 @@ def page_cover(c: Canvas, report: dict[str, Any]) -> None:
     c.rect(M, H - 300, 8, 150, fill=1, stroke=0)
     c.setFillColor(YELLOW)
     c.setFont(F["Semi"], 11)
-    c.drawString(M + 24, H - 162, "PROJET FINAL · PYTHON AVANCÉ · ING3")
+    c.drawString(M + 24, H - 162,
+                 adapt("PROJET FINAL · PYTHON AVANCÉ · ING3"))
     c.setFillColor(white)
     c.setFont(F["Head"], 44)
     c.drawString(M + 24, H - 212, "Analyser 12 Go")
@@ -601,7 +639,7 @@ def page_cover(c: Canvas, report: dict[str, Any]) -> None:
     # plan de la présentation : un module = une couleur
     c.setFillColor(YELLOW)
     c.setFont(F["Head"], 13)
-    c.drawString(M, H - 520, "AU PROGRAMME")
+    c.drawString(M, H - 520, adapt("AU PROGRAMME"))
     plan = [(1, "Ingestion & générateurs"), (2, "Pipeline fonctionnel"),
             (3, "Agrégation & détection"), (4, "Règles & introspection")]
     for i, (number, name) in enumerate(plan):
@@ -1264,31 +1302,25 @@ def page_closing(c: Canvas, report: dict[str, Any]) -> None:
     c.roundRect(M, 44, W - 2 * M, 50, 10, fill=1, stroke=0)
     c.setFillColor(YELLOW)
     c.setFont(F["Head"], 13)
-    c.drawString(M + 16, 72, "DÉMO")
+    label = adapt("DÉMO")
+    c.drawString(M + 16, 72, label)
+    text_x = M + 30 + pdfmetrics.stringWidth(label, F["Head"], 13)
     c.setFillColor(white)
     c.setFont(F["Mono"], 9)
-    c.drawString(M + 70, 72, "python main.py demo     python main.py live "
+    c.drawString(text_x, 72, "python main.py demo     python main.py live "
                  "    python -m pytest")
     c.setFillColor(HexColor("#C9CCE6"))
     c.setFont(F["Body"], 8.5)
-    c.drawString(M + 70, 56, "Code complet : " + GITHUB_URL)
+    c.drawString(text_x, 56, "Code complet : " + GITHUB_URL)
     footer(c, 11)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Support de soutenance")
-    parser.add_argument("--results", type=Path, default=ROOT / "output")
-    parser.add_argument("--out", type=Path,
-                        default=HERE / "Synthese_soutenance.pdf")
-    args = parser.parse_args()
-    report = json.loads((args.results / "report.json").read_text("utf-8"))
-    audit_path = args.results / "audit.json"
-    audit = json.loads(audit_path.read_text("utf-8")) \
-        if audit_path.exists() else None
-    figures = HERE / "_figures"
-    figures.mkdir(exist_ok=True)
-    c = Canvas(str(args.out), pagesize=A4)
-    c.setTitle("Support de soutenance — Engine d'analyse de logs")
+def build(out: Path, report: dict[str, Any], audit: dict[str, Any] | None,
+          figures: Path) -> None:
+    """Dessine les 11 pages dans ``out`` (selon la valeur de PROF)."""
+    c = Canvas(str(out), pagesize=A4)
+    kind = "Rapport final" if PROF else "Support de soutenance"
+    c.setTitle(f"{kind} — Engine d'analyse de logs")
     c.setAuthor(", ".join(TEAM))
     pages = [
         lambda: page_cover(c, report),
@@ -1308,7 +1340,25 @@ def main() -> None:
             c.showPage()
         draw()
     c.save()
-    print(f"Support écrit : {args.out} ({len(pages)} pages)")
+    print(f"{kind} écrit : {out} ({len(pages)} pages)")
+
+
+def main() -> None:
+    global PROF
+    parser = argparse.ArgumentParser(
+        description="Support de soutenance et rapport final (PDF)")
+    parser.add_argument("--results", type=Path, default=ROOT / "output")
+    args = parser.parse_args()
+    report = json.loads((args.results / "report.json").read_text("utf-8"))
+    audit_path = args.results / "audit.json"
+    audit = json.loads(audit_path.read_text("utf-8")) \
+        if audit_path.exists() else None
+    figures = HERE / "_figures"
+    figures.mkdir(exist_ok=True)
+    for prof, name in ((False, "Synthese_soutenance.pdf"),
+                       (True, "Rapport_final.pdf")):
+        PROF = prof
+        build(HERE / name, report, audit, figures)
 
 
 if __name__ == "__main__":

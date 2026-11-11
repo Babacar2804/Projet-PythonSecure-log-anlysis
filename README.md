@@ -91,12 +91,17 @@ Il est construit automatiquement à partir des résultats de l'analyse :
 
 ```bash
 python main.py analyze                       # produit output/
-python docs/rapport/build_synthese.py        # -> docs/rapport/Synthese_soutenance.pdf
+python docs/rapport/build_synthese.py        # -> les deux PDF ci-dessous
 ```
 
-`Synthese_soutenance.pdf` est le support de soutenance (11 pages) : une
-ouverture, deux pages par module (ce qu'on présente, puis les résultats et
-les questions probables du jury) et une conclusion.
+La même commande produit deux documents de 11 pages, avec la même mise en
+page (introduction, deux pages par module, conclusion) :
+
+- `Rapport_final.pdf` : **le rapport rendu au professeur** (réalisation,
+  extraits de code, résultats, choix techniques justifiés) ;
+- `Synthese_soutenance.pdf` : le support d'oral de l'équipe (points à dire
+  dans l'ordre, questions probables du jury, transitions entre modules).
+
 Une version détaillée peut aussi être générée localement avec
 `python docs/rapport/build_report.py` (elle n'est pas versionnée).
 
