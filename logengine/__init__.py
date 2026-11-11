@@ -1,4 +1,4 @@
-"""logengine : moteur d'ingestion, de nettoyage et d'analyse de logs.
+"""logeengine : moteur d'ingestion, de nettoyage et d'analyse de logs.
 
 Organisation des modules :
     generator    -> fabrique le jeu de données (logs volumineux et "sales")
