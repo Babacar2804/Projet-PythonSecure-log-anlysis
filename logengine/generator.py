@@ -32,6 +32,7 @@ import json
 import random
 import re
 import shutil
+import threading
 import time
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -258,9 +259,13 @@ class LogFactory:
     C'est ``NoiseInjector`` qui assemble la ligne finale (et l'abîme parfois).
     """
 
-    def __init__(self, pools: Pools, rng: random.Random) -> None:
+    def __init__(self, pools: Pools, rng: random.Random,
+                 attack_probability: float = 0.02) -> None:
         self.pools = pools
         self.rng = rng
+        # probabilité, pour chaque minute, de lancer une attaque par force
+        # brute (augmentée en mode "live" pour que la démo soit parlante)
+        self.attack_probability = attack_probability
 
     # ------------------------------------------------------------ outils
     def client_ip(self) -> str:
@@ -643,9 +648,9 @@ class LogFactory:
         """
         rng = self.rng
         events: list[tuple] = []
-        if rng.random() < 0.02:
+        if rng.random() < self.attack_probability:
             self._brute_force(events)
-        if rng.random() < 0.01:
+        if rng.random() < self.attack_probability / 2:
             self._port_scan(events)
         for service in ctx["outage"]:
             for _ in range(rng.randint(2, 6)):
@@ -1039,6 +1044,39 @@ def generate_file(job: dict) -> tuple[str, int, int, float]:
             written += len(data)
             lines += len(out)
     return job["path"], written, lines, time.perf_counter() - started
+
+
+def write_live(path: Path, lines_per_second: int, duration: float,
+               stop: threading.Event, seed: int = 42,
+               dirty_rate: float = 0.05) -> None:
+    """Ajoute des lignes à un fichier en continu, pour simuler un serveur.
+
+    Toutes les minutes, on fabrique les lignes de la minute courante (avec
+    l'heure réelle), puis on les écrit par paquets, une fois par seconde.
+    ``stop`` (un ``threading.Event``) permet d'arrêter l'écriture depuis
+    le programme principal.
+    """
+    rng = random.Random(seed)
+    factory = LogFactory(Pools(seed), rng, attack_probability=1.0)
+    noise = NoiseInjector(rng, dirty_rate)
+    deadline = time.monotonic() + duration
+    with open(path, "ab") as file:
+        while not stop.is_set() and time.monotonic() < deadline:
+            now = datetime.now(timezone.utc)
+            minute = int((now - START_DATE).total_seconds() // 60)
+            # base calculée pour obtenir ~lines_per_second lignes / seconde
+            lines = lines_for_minute(factory, noise, minute,
+                                     lines_per_second * 60
+                                     / activity(minute, {"ddos": False}),
+                                     [])
+            batch = max(1, len(lines) // 60)
+            for start in range(0, len(lines), batch):
+                if stop.is_set() or time.monotonic() >= deadline:
+                    break
+                chunk = "\n".join(lines[start:start + batch]) + "\n"
+                file.write(chunk.encode("utf-8", "surrogateescape"))
+                file.flush()                # visible tout de suite
+                time.sleep(1)
 
 
 def estimate_line_size(seed: int, dirty_rate: float,

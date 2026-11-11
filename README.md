@@ -26,11 +26,25 @@ python main.py analyze                       # analyse de data/raw -> output/
 python main.py analyze --limit 2000000       # seulement 2 M de lignes
 python main.py analyze --level ERROR --service payment-service
 python main.py analyze --trace-memory        # mesure le pic mémoire
+python main.py live --duration 60            # analyse en temps réel
 python main.py --help                        # toutes les options
 ```
 
 Durées mesurées (8 cœurs) : génération de 12 Go (69 M de lignes) en 75 s ;
-analyse à ≈ 72 000 lignes/s, soit 16 min pour 12 Go (un seul processus).
+analyse à ≈ 72 000 lignes/s, soit environ 17 min pour 12 Go (un seul processus).
+
+### Mode temps réel
+
+`python main.py live` simule un serveur qui écrit ses logs en continu
+(`data/live/live.log`) pendant que le pipeline suit le fichier comme
+`tail -f`. Les alertes s'affichent dès que la ligne est écrite.
+
+## Tests et vérifications
+
+```bash
+python -m pytest                              # 75 tests automatiques
+python -m mypy                                # vérification du typage
+```
 
 ## Résultats (dossier `output/`)
 
@@ -47,20 +61,22 @@ analyse à ≈ 72 000 lignes/s, soit 16 min pour 12 Go (un seul processus).
 ## Arborescence
 
 ```
-main.py                  point d'entrée (CLI) : generate / analyze / demo
+main.py                  point d'entrée (CLI) : generate / analyze / demo / live
 requirements.txt
+pyproject.toml           configuration de pytest et mypy
 logengine/
     config.py            constantes (dossiers, niveaux, services)
     models.py            types : LogRecord, Alert, Connection
     generator.py         génération du jeu de données
-    ingestion.py         Module 1 : yield / yield from
+    ingestion.py         Module 1 : yield / yield from, suivi temps réel
     parsing.py           Module 1-2 : ligne -> dict, routage match-case
     transform.py         Module 2 : nettoyage, normalisation (map/filter)
-    aggregation.py       Module 3 : defaultdict, set, frozenset
+    aggregation.py       Module 3 : defaultdict, set, frozenset, tuples
     detection.py         Module 3 : force brute (while/for/break/continue/else)
     rules.py             Module 4 : apply_security_rules(*args, **kwargs)
     audit.py             Module 4 : globals() / locals()
     report.py            exports JSON / CSV / PNG
+tests/                   tests pytest (un fichier par module)
 docs/EXPLICATIONS.md     explication détaillée pour la soutenance
 ```
 

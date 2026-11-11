@@ -12,7 +12,7 @@ la validation se font dans ``transform.normalize_record``.
 """
 
 import json
-from typing import Any
+from typing import Any, cast
 
 from logengine.config import APP_FIELD_COUNT
 from logengine.models import LogRecord
@@ -46,9 +46,13 @@ def split_endpoint(text: str) -> tuple[str, str, str]:
 
 
 def _new_record(line: str, source: str, **fields: Any) -> LogRecord:
-    """Crée un enregistrement avec les listes ``errors`` / ``fixes`` vides."""
-    return {"raw": line, "source": source, "errors": [], "fixes": [],
-            **fields}
+    """Crée un enregistrement avec les listes ``errors`` / ``fixes`` vides.
+
+    ``cast`` indique à mypy que ce dict a bien la forme d'un ``LogRecord``
+    (il ne peut pas le vérifier seul à cause du ``**fields`` variable).
+    """
+    return cast(LogRecord, {"raw": line, "source": source, "errors": [],
+                            "fixes": [], **fields})
 
 
 def _rejected(line: str, reason: str) -> LogRecord:

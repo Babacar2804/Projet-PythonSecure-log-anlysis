@@ -2,11 +2,12 @@
 
 Une règle est une simple fonction ``regle(record, **config)`` qui renvoie
 une alerte (dict) ou ``None``. Les fonctions sont des objets de première
-classe : on peut les ranger dans un tuple, les passer en argument, lire
-leur nom avec ``__name__``...
+classe : on peut les ranger dans un tuple, les passer en argument, en
+renvoyer une, lire leur nom avec ``__name__``...
 
-    apply_security_rules(record, rule_sql_injection, rule_xss,
-                         blacklist=ips, max_latency_ms=5000)
+    check = apply_security_rules(rule_sql_injection, rule_xss,
+                                 blacklist=ips, max_latency_ms=5000)
+    alerts = check(record)
 """
 
 import re
@@ -132,11 +133,14 @@ def rule_slow_request(record: LogRecord, **config: Any) -> Alert | None:
 def rule_exposed_port(record: LogRecord, **config: Any) -> Alert | None:
     """Pare-feu qui ACCEPTE un port sensible depuis Internet."""
     ports = config.get("sensitive_ports", DEFAULT_SENSITIVE_PORTS)
-    match record["payload"]:
-        case {"action": "ACCEPT", "dst_port": int(port)} if (
-                port in ports and not is_private_ip(record["ip"])):
+    # Motif imbriqué : un dict dont la clé "connection" contient un tuple
+    # (IP, port, "TCP") et dont le payload indique un ACCEPT.
+    match record:
+        case {"connection": (str(ip), _, "TCP"),
+              "payload": {"action": "ACCEPT", "dst_port": int(port)}} if (
+                port in ports and not is_private_ip(ip)):
             return make_alert(record, "port_sensible_expose", "HIGH",
-                              f"port {port} ouvert depuis {record['ip']}")
+                              f"port {port} ouvert depuis {ip}")
         case _:
             return None
 
@@ -150,30 +154,48 @@ DEFAULT_RULES: tuple[Rule, ...] = (
 
 
 # ------------------------------------------------------- fonction maître
-def apply_security_rules(record: LogRecord, *rules: Rule,
-                         **config: Any) -> list[Alert]:
-    """Applique un nombre variable de règles à un enregistrement.
+RuleChecker = Callable[[LogRecord], list[Alert]]
 
-    - ``*rules``   : les fonctions de règles, regroupées dans un tuple ;
-    - ``**config`` : les paramètres nommés, regroupés dans un dict, puis
-      retransmis tels quels à chaque règle avec ``rule(record, **config)``.
-      Chaque règle y prend ce dont elle a besoin (``config.get(...)``).
-    - ``config["disabled"]`` permet de désactiver des règles par leur nom.
 
-    Une règle qui plante ne doit pas arrêter tout le moteur : l'exception
-    est signalée et on passe à la règle suivante.
+def apply_security_rules(*args: Rule, **kwargs: Any) -> RuleChecker:
+    """Fonction maître du moteur de règles.
+
+    - ``*args``    : un nombre variable de fonctions de sécurité (un tuple) ;
+    - ``**kwargs`` : des paramètres de configuration (un dict), retransmis
+      tels quels à chaque règle avec ``rule(record, **kwargs)``. Chaque
+      règle y prend ce dont elle a besoin (``kwargs.get(...)``).
+    - ``kwargs["disabled"]`` désactive des règles par leur nom.
+
+    Elle renvoie une NOUVELLE fonction, ``check(record)``, qui applique
+    toutes les règles actives à un enregistrement. On prépare donc le moteur
+    une seule fois, puis on l'appelle sur chaque ligne :
+
+        check = apply_security_rules(rule_sql_injection, rule_xss,
+                                     blacklist=ips, max_latency_ms=5000)
+        alerts = check(record)
+
+    ``check`` "se souvient" de ``active`` et de ``kwargs`` même après la
+    fin d'``apply_security_rules`` : c'est ce qu'on appelle une fermeture
+    (closure).
     """
-    disabled = config.get("disabled", ())
-    alerts: list[Alert] = []
-    for rule in rules:
-        if rule.__name__ in disabled:
-            continue
-        try:
-            alert = rule(record, **config)
-        except Exception as exc:            # noqa: BLE001 - robustesse voulue
-            print(f"[règles] {rule.__name__} a échoué : {exc!r}",
-                  file=sys.stderr)
-        else:                               # exécuté seulement sans exception
-            if alert is not None:
-                alerts.append(alert)
-    return alerts
+    for rule in args:
+        if not callable(rule):
+            raise TypeError(f"une règle doit être une fonction, pas {rule!r}")
+    disabled = kwargs.get("disabled", ())
+    active = tuple(filter(lambda rule: rule.__name__ not in disabled, args))
+
+    def check(record: LogRecord) -> list[Alert]:
+        alerts: list[Alert] = []
+        for rule in active:
+            try:
+                alert = rule(record, **kwargs)
+            except Exception as exc:        # noqa: BLE001 - robustesse voulue
+                # une règle qui plante ne doit pas arrêter tout le moteur
+                print(f"[règles] {rule.__name__} a échoué : {exc!r}",
+                      file=sys.stderr)
+            else:                           # exécuté seulement sans exception
+                if alert is not None:
+                    alerts.append(alert)
+        return alerts
+
+    return check

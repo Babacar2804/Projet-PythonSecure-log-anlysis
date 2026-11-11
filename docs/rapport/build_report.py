@@ -36,12 +36,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # ---------------------------------------------------------------------------
 # À COMPLÉTER PAR L'ÉQUIPE, puis relancer le script
-TEAM = ["NAYME Yanis", "GUEYE Babacar Mansour", "CLABAU Brandon", "LYOUBI Mehdi"]
+TEAM = ["NAYME Yanis", "GUEYE Babacar Mansour", "CLABAU Brandon",
+        "LYOUBI Mehdi"]
 SCHOOL = "Niveau ING3"
 TEACHER = "Enseignant : JOUD HANAY"
 GITHUB_URL = "https://github.com/Babacar2804/Projet-PythonSecure-log-anlysis"
 # Mesures faites avec `python main.py analyze --trace-memory --limit N`
-MEMORY_MEASURES = [(290_699, 12.5), (2_000_000, 16.1)]
+MEMORY_MEASURES = [(290_699, 12.5), (2_000_000, 18.9)]
+TESTS_COUNT = 75        # résultat de `python -m pytest`
 # ---------------------------------------------------------------------------
 
 INK = colors.HexColor("#0b0b0b")
@@ -250,7 +252,7 @@ def draw_pipeline(path: Path) -> Path:
     consumers = [
         ("stats.update()", "defaultdict, set"),
         ("detector.feed()", "fenêtre glissante"),
-        ("apply_security_rules()", "*rules, **config"),
+        ("check_rules(record)", "*args, **kwargs"),
     ]
     fig, ax = plt.subplots(figsize=(10, 7.4))
     ax.set_xlim(0, 10)
@@ -313,7 +315,7 @@ def draw_memory(path: Path) -> Path:
                 fontsize=10, color="#0b0b0b")
     ax.set_ylim(0, max(peaks) * 1.35)
     ax.set_ylabel("Pic mémoire Python (Mo)", color="#52514e")
-    ax.set_title("7 fois plus de lignes, presque la même mémoire",
+    ax.set_title("7 fois plus de lignes, seulement 1,5 fois plus de mémoire",
                  loc="left", fontsize=11)
     for side in ("top", "right"):
         ax.spines[side].set_visible(False)
@@ -395,8 +397,8 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
     ]
     story += bullets([
         "<b>Module 1</b> — ingestion par générateurs (<font name='%s'>yield"
-        "</font>, <font name='%s'>yield from</font>) et parsing en "
-        "dictionnaires ;" % (MONO, MONO),
+        "</font>, <font name='%s'>yield from</font>), suivi d'un flux en "
+        "temps réel et parsing en dictionnaires ;" % (MONO, MONO),
         "<b>Module 2</b> — pipeline fonctionnel (<font name='%s'>map</font>, "
         "<font name='%s'>filter</font>, <font name='%s'>lambda</font>) et "
         "routage par <font name='%s'>match-case</font> ;"
@@ -418,28 +420,34 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
           "</font> est généré par <font name='%s'>pip freeze</font> : il "
           "permet de reconstruire exactement le même environnement. Le moteur "
           "lui-même n'utilise que la bibliothèque standard ; matplotlib sert "
-          "aux graphiques et reportlab à produire ce rapport." %
-          (MONO, MONO, MONO)),
+          "aux graphiques, reportlab à produire ce rapport, pytest et mypy "
+          "à vérifier le code." % (MONO, MONO, MONO)),
         code("python -m venv .venv\n"
              ".venv\\Scripts\\activate          # Windows\n"
              "pip install -r requirements.txt\n\n"
              "python main.py demo                     # test + analyse\n"
              "python main.py generate --size-gb 12    # jeu de 12 Go\n"
              "python main.py analyze                  # analyse complète\n"
-             "python main.py analyze --limit 2000000 --level ERROR"),
+             "python main.py analyze --limit 2000000 --level ERROR\n"
+             "python main.py live --duration 60       # temps réel\n\n"
+             "python -m pytest                        # 75 tests\n"
+             "python -m mypy                          # typage"),
         h2("2.2 Structure en package"),
         p("Le code est organisé en package Python (<font name='%s'>logengine"
           "</font>), un fichier par responsabilité. Le point d'entrée <font "
-          "name='%s'>main.py</font> pilote l'ensemble via trois commandes. "
+          "name='%s'>main.py</font> pilote l'ensemble via quatre commandes. "
           "Aucun notebook n'est utilisé. Le code est versionné avec Git et "
           "partagé sur GitHub ; les données générées en sont exclues par le "
           "<font name='%s'>.gitignore</font>." % (MONO, MONO, MONO)),
         table([
             ["Fichier", "Rôle", "Module"],
             ["main.py",
-             "CLI : generate, analyze, demo ; construit le pipeline", "—"],
-            ["generator.py", "Génère le jeu de données (multiprocessus)", "—"],
-            ["ingestion.py", "Lecture paresseuse des fichiers", "1"],
+             "CLI : generate, analyze, demo, live ; construit le pipeline",
+             "—"],
+            ["generator.py", "Génère le jeu de données (multiprocessus) et "
+             "le flux temps réel", "—"],
+            ["ingestion.py", "Lecture paresseuse des fichiers, suivi en "
+             "direct", "1"],
             ["parsing.py", "Ligne brute → dictionnaire, routage match-case",
              "1 et 2"],
             ["transform.py", "Nettoyage, normalisation, suivi qualité", "2"],
@@ -448,6 +456,7 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
             ["rules.py", "Moteur de règles de sécurité", "4"],
             ["audit.py", "Introspection globals() / locals()", "4"],
             ["report.py", "Exports JSON / CSV et graphiques", "—"],
+            ["tests/", "75 tests pytest, un fichier par module", "tous"],
         ], [3.6, 10.4, 2]),
     ]
 
@@ -564,8 +573,8 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
              "for record in records:                        # une passe\n"
              "    stats.update(record)\n"
              "    detector.feed(record)\n"
-             "    for alert in apply_security_rules(record, *DEFAULT_RULES,\n"
-             "                                      **rule_config):\n"
+             "    for alert in check_rules(record):  "
+             "# check_rules = apply_security_rules(...)\n"
              "        alert_writer.writerow(alert)"),
         p("Comme un générateur ne se parcourt qu'une fois, tous les calculs "
           "(statistiques, détection, règles) sont faits <b>dans la même "
@@ -606,7 +615,42 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
           "dans un <b>tuple immuable</b> <font name='%s'>(IP, Port, "
           "Protocole)</font> : il ne peut pas être modifié par erreur et, "
           "étant hachable, il peut servir de clé de dictionnaire ou "
-          "d'élément d'ensemble." % (MONO, MONO, MONO, MONO, MONO)),
+          "d'élément d'ensemble (voir 7.2)." %
+          (MONO, MONO, MONO, MONO, MONO)),
+        h2("5.3 Traitement en temps réel"),
+        p("Le moteur sait aussi analyser un flux <b>en direct</b>. <font "
+          "name='%s'>follow_log_file</font> est un générateur infini qui suit "
+          "un fichier en train de grossir, comme <font name='%s'>tail -f"
+          "</font> : quand il n'y a rien de nouveau, il attend au lieu de "
+          "s'arrêter, et il n'émet une ligne qu'une fois son <font name='%s'>"
+          "\\n</font> final écrit." % (MONO, MONO, MONO)),
+        code("while deadline is None or time.monotonic() < deadline:\n"
+             "    chunk = file.readline()\n"
+             "    if not chunk:                   # rien de nouveau\n"
+             "        time.sleep(poll_interval)\n"
+             "        continue\n"
+             "    pending += chunk\n"
+             "    if not pending.endswith(\"\\n\"):  # ligne incomplète\n"
+             "        continue\n"
+             "    yield pending\n"
+             "    pending = \"\""),
+        p("La commande <font name='%s'>python main.py live</font> lance dans "
+          "un <font name='%s'>thread</font> un « serveur » simulé qui écrit "
+          "environ 200 lignes par seconde, pendant que le programme principal "
+          "suit le fichier. Les lignes passent par <b>exactement le même "
+          "pipeline</b> que les archives (<font name='%s'>build_pipeline"
+          "</font>) : seule la source change. Extrait d'une exécution :" %
+          (MONO, MONO, MONO)),
+        code("[live] 1,571 lignes lues, 1,547 valides, 1 alertes\n"
+             "  [HIGH    ] path_traversal   213.67.29.14    "
+             "/download?file=..%2f..%2fetc%2fshadow\n"
+             "  [HIGH    ] ip_blacklistee   92.112.165.218  "
+             "login_failed depuis une IP en liste noire\n"
+             "  [FORCE BRUTE] 92.112.165.218 : 5 échecs en moins de 2 min\n"
+             "  [HIGH    ] xss              217.135.14.178  "
+             "/profile?name=javascript:alert(document.cookie)\n"
+             "=== Bilan temps réel : 7,065 lignes, 6,956 valides, "
+             "1 IP suspectes ==="),
     ]
 
     # 6. Module 2 -----------------------------------------------------------
@@ -747,15 +791,47 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
           "logs : ce sont précisément les attaquants et machines du botnet "
           "injectés par le générateur, ce qui valide la chaîne complète."),
     ]
+    flows = stats.get("top_flux_bloques", [])
+    if flows:
+        protocols = stats.get("par_protocole", {})
+        story += [
+            h2("7.3 Tuples de connexion : flux bloqués et scans de ports"),
+            p("Le tuple <font name='%s'>(IP, Port, Protocole)</font> est "
+              "exploité de trois façons. Il est d'abord <b>déballé</b> "
+              "(<font name='%s'>ip, _, protocol = record[\"connection\"]"
+              "</font>) pour compter les protocoles : %s. Ensuite, pour "
+              "chaque blocage du pare-feu, le tuple (IP source, port visé, "
+              "protocole) sert de <b>clé de dictionnaire</b> — ce qui n'est "
+              "possible que parce qu'il est immuable. %s flux distincts ont "
+              "été comptés ; les plus fréquents :" % (
+                  MONO, MONO,
+                  ", ".join(f"{fmt(n)} {name}" for name, n in sorted(
+                      protocols.items(), key=lambda kv: -kv[1])),
+                  fmt(stats.get("nb_flux_bloques_distincts", 0)))),
+            code("self.blocked_flows[(ip, port, protocol)] += 1\n\n"
+                 "for ip, port, _protocol in self.blocked_flows:   "
+                 "# déballage\n"
+                 "    ports_by_ip[ip].add(port)                    "
+                 "# defaultdict(set)"),
+            table([["IP source", "Port visé", "Protocole", "Blocages"]] +
+                  [[f["ip"], str(f["port"]), f["protocole"],
+                    fmt(f["blocages"])] for f in flows[:8]],
+                  [5.0, 3.0, 3.5, 4.5]),
+            Spacer(1, 0.3 * cm),
+        ]
     scanners = stats.get("scans_de_ports", {})
     if scanners:
-        story += [p(f"Le croisement IP → ports bloqués par le pare-feu "
-                    f"(<font name='%s'>defaultdict(set)</font>) révèle "
-                    f"<b>{len(scanners)} IP</b> ayant tenté au moins 15 "
-                    "ports différents : des <b>scans de ports</b>." % MONO)]
+        story += [p(f"Enfin, en regroupant ces clés par IP (<font name='%s'>"
+                    f"defaultdict(set)</font>), on repère <b>{len(scanners)}"
+                    " IP</b> ayant tenté au moins 15 ports différents : des "
+                    "<b>scans de ports</b>. Dans <font name='%s'>"
+                    "rule_exposed_port</font>, un même <font name='%s'>match"
+                    "</font> combine un motif dictionnaire et un motif tuple "
+                    "(<font name='%s'>{\"connection\": (str(ip), _, \"TCP\"), "
+                    "...}</font>)." % (MONO, MONO, MONO, MONO))]
 
     story += [
-        h2("7.3 Détection de force brute"),
+        h2("7.4 Détection de force brute"),
         p("Pendant la lecture, <font name='%s'>feed()</font> maintient pour "
           "chaque IP une <b>fenêtre glissante</b> des échecs des 120 "
           "dernières secondes (une <font name='%s'>deque</font>). Une boucle "
@@ -821,33 +897,49 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
         h2("8.1 Une fonction maître à arguments variables"),
         p("Une règle est une simple fonction <font name='%s'>regle(record, "
           "**config)</font> qui renvoie une alerte ou <font name='%s'>None"
-          "</font>. La fonction maître reçoit un nombre variable de règles "
-          "(<font name='%s'>*rules</font>, regroupées dans un tuple) et de "
-          "paramètres nommés (<font name='%s'>**config</font>, regroupés "
-          "dans un dict) qu'elle retransmet à chaque règle :" %
-          (MONO, MONO, MONO, MONO)),
-        code("def apply_security_rules(record, *rules, **config):\n"
-             "    alerts = []\n"
-             "    for rule in rules:\n"
-             "        if rule.__name__ in config.get(\"disabled\", ()):\n"
-             "            continue\n"
-             "        try:\n"
-             "            alert = rule(record, **config)\n"
-             "        except Exception as exc:\n"
-             "            print(f\"{rule.__name__} a échoué : {exc!r}\")\n"
-             "        else:\n"
-             "            if alert is not None:\n"
-             "                alerts.append(alert)\n"
-             "    return alerts\n\n"
-             "apply_security_rules(record, *DEFAULT_RULES, "
+          "</font>. La fonction maître a exactement la signature demandée, "
+          "<font name='%s'>apply_security_rules(*args, **kwargs)</font> : "
+          "<font name='%s'>*args</font> regroupe un nombre variable de "
+          "règles dans un tuple, <font name='%s'>**kwargs</font> la "
+          "configuration dans un dict. Comme l'enregistrement à analyser ne "
+          "fait pas partie de ces arguments, elle <b>fabrique et renvoie une "
+          "fonction</b> <font name='%s'>check(record)</font>, préparée une "
+          "seule fois puis appelée sur chaque ligne :" %
+          (MONO, MONO, MONO, MONO, MONO, MONO)),
+        code("def apply_security_rules(*args, **kwargs):\n"
+             "    for rule in args:\n"
+             "        if not callable(rule):\n"
+             "            raise TypeError(...)\n"
+             "    disabled = kwargs.get(\"disabled\", ())\n"
+             "    active = tuple(filter(lambda rule: rule.__name__ not in "
+             "disabled, args))\n\n"
+             "    def check(record):\n"
+             "        alerts = []\n"
+             "        for rule in active:\n"
+             "            try:\n"
+             "                alert = rule(record, **kwargs)\n"
+             "            except Exception as exc:\n"
+             "                print(f\"{rule.__name__} a échoué : "
+             "{exc!r}\")\n"
+             "            else:\n"
+             "                if alert is not None:\n"
+             "                    alerts.append(alert)\n"
+             "        return alerts\n\n"
+             "    return check\n\n"
+             "check_rules = apply_security_rules(*DEFAULT_RULES, "
              "blacklist=blacklist,\n"
-             "                     max_latency_ms=5000)"),
+             "                                   max_latency_ms=5000)\n"
+             "alerts = check_rules(record)"),
         p("Les fonctions sont manipulées comme des <b>objets de première "
           "classe</b> : rangées dans un tuple, passées en argument, "
-          "identifiées par <font name='%s'>__name__</font>. Ajouter une "
-          "règle revient à écrire une fonction ; une règle qui plante est "
-          "isolée par le <font name='%s'>try / except / else</font> et "
-          "n'arrête pas le moteur." % (MONO, MONO)),
+          "<b>renvoyées</b> par une autre fonction, identifiées par <font "
+          "name='%s'>__name__</font>. <font name='%s'>check</font> garde "
+          "accès à <font name='%s'>active</font> et <font name='%s'>kwargs"
+          "</font> après la fin de la fonction maître : c'est une "
+          "<b>fermeture</b> (closure). Ajouter une règle revient à écrire une "
+          "fonction ; une règle qui plante est isolée par le <font name='%s'>"
+          "try / except / else</font> et n'arrête pas le moteur." %
+          (MONO, MONO, MONO, MONO, MONO)),
         table([
             ["Règle", "Détecte", "Alertes"],
             *[[name.replace("_", " "), desc, fmt(alerts.get(name, 0))]
@@ -883,7 +975,7 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
     ]
     if audit:
         wanted = ("stats", "detector", "blacklist", "lines", "records",
-                  "tracker", "rule_config")
+                  "tracker", "check_rules")
         rows = [r for r in audit["locales"] if r["nom"] in wanted]
         story += [table(
             [["Variable locale", "Type", "Taille (octets)", "Aperçu"]] +
@@ -927,10 +1019,21 @@ def build_story(results: Path, charts: Path, tmp: Path) -> list:
     story += bullets([
         "<b>PEP 8</b> : vérifié avec <font name='%s'>pycodestyle</font>, "
         "aucune erreur." % MONO,
-        "<b>Typage</b> : annotations sur toutes les fonctions, <font name="
-        "'%s'>TypedDict</font> pour les enregistrements et les alertes, "
-        "alias <font name='%s'>Connection = tuple[str, int, str]</font>."
-        % (MONO, MONO),
+        "<b>Typage vérifié</b> : annotations sur toutes les fonctions, "
+        "<font name='%s'>TypedDict</font> pour les enregistrements et les "
+        "alertes, alias <font name='%s'>Connection = tuple[str, int, str]"
+        "</font>. <font name='%s'>mypy</font> contrôle tout le projet "
+        "(code et tests) : <b>0 erreur</b>. Il avait relevé 6 imprécisions "
+        "réelles, corrigées (par exemple une variable pouvant valoir "
+        "<font name='%s'>None</font>)." % (MONO, MONO, MONO, MONO),
+        "<b>Tests automatiques</b> : <b>%d tests pytest</b>, un fichier par "
+        "module : réparation des lignes sales, motifs <font name='%s'>match"
+        "</font>, opérations ensemblistes, sortie par <font name='%s'>break"
+        "</font> ou par le <font name='%s'>else</font> de la boucle de "
+        "détection, transmission des <font name='%s'>**kwargs</font> aux "
+        "règles, isolation d'une règle défaillante, suivi temps réel, et un "
+        "test de bout en bout qui génère un jeu de données puis exécute tout "
+        "le pipeline." % (TESTS_COUNT, MONO, MONO, MONO, MONO),
         "<b>Exceptions</b> : aucune donnée sale ne fait planter le pipeline ; "
         "<font name='%s'>try / except / else</font> dans le moteur de "
         "règles, gestion des fichiers manquants à l'ingestion, <font name="

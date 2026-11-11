@@ -7,6 +7,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"          # gros jeu de données (10-15 Go)
 DEMO_DIR = DATA_DIR / "demo"        # petit jeu de test pour la démo
+LIVE_DIR = DATA_DIR / "live"        # fichier suivi en temps réel
 OUTPUT_DIR = PROJECT_ROOT / "output"
 BLACKLIST_NAME = "blacklist.txt"    # écrit par le générateur à côté des logs
 

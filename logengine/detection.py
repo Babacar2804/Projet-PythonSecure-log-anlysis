@@ -38,11 +38,16 @@ class BruteForceDetector:
         # ip -> informations sur l'IP suspecte
         self._suspects: dict[str, dict[str, Any]] = {}
 
-    def feed(self, record: LogRecord) -> None:
-        """Met à jour l'état avec un enregistrement (appelé à chaque ligne)."""
+    def feed(self, record: LogRecord) -> str | None:
+        """Met à jour l'état avec un enregistrement (appelé à chaque ligne).
+
+        Renvoie un signal utile au mode temps réel : "suspect" quand une IP
+        vient de franchir le seuil, "compromis" quand une connexion réussit
+        juste après une série d'échecs, sinon None.
+        """
         event = record["event"]
         if event not in AUTH_EVENTS:
-            return
+            return None
         ip, moment, user = record["ip"], record["timestamp"], record["user"]
         success = event in AUTH_SUCCESS_EVENTS
 
@@ -55,8 +60,13 @@ class BruteForceDetector:
                 suspect["users"].add(user)
 
         if success:
-            self._recent.pop(ip, None)      # succès : compteur remis à zéro
-            return
+            # succès : compteur remis à zéro (on regarde avant s'il suivait
+            # une série d'échecs suffisante)
+            failures = self._recent.pop(ip, deque())
+            if (len(failures) >= self.threshold
+                    and moment - failures[-1][0] <= self.window):
+                return "compromis"
+            return None
 
         window = self._recent[ip]
         window.append((moment, user))
@@ -72,6 +82,8 @@ class BruteForceDetector:
                 "events": deque(((t, u, False) for t, u in window),
                                 maxlen=self.history_size),
             }
+            return "suspect"
+        return None
 
     def summarize(self) -> list[dict[str, Any]]:
         """Analyse finale de chaque IP suspecte.

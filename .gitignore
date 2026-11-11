@@ -5,6 +5,7 @@ venv/
 # Données générées (plusieurs Go : on ne les met JAMAIS dans Git)
 data/raw/
 data/demo/
+data/live/
 output/
 docs/rapport/_figures/
 

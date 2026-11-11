@@ -112,6 +112,7 @@ def parse_timestamp(value: Any) -> tuple[datetime | None, bool]:
         return None, False
     canonical = value.endswith("Z") and "T" in value
     text = value.replace("Z", "+00:00").replace(",", ".")
+    moment: datetime | None
     try:
         moment = datetime.fromisoformat(text)
     except ValueError:
@@ -303,7 +304,7 @@ def normalize_record(record: LogRecord) -> LogRecord:
         _clean_payload_fields(payload, fixes)
     record["payload"] = payload
 
-    if not errors:
+    if not errors and ip is not None:
         # Métadonnées fixes de la connexion : un tuple immuable
         record["connection"] = (ip, record["port"], protocol)
     return record

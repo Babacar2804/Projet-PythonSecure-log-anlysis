@@ -5,11 +5,12 @@
 """
 
 from collections import defaultdict
+from collections.abc import Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from logengine.models import LogRecord
+from logengine.models import Connection, LogRecord
 from logengine.transform import validate_ip
 
 LATENCY_BUCKETS = (10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000)
@@ -24,7 +25,7 @@ def load_blacklist(path: Path) -> frozenset[str]:
     if not path.exists():
         return frozenset()
     with open(path, encoding="utf-8") as file:
-        lines = map(str.strip, file)
+        lines: Iterator[str] = map(str.strip, file)
         lines = filter(None, lines)                     # lignes vides
         lines = filter(lambda line: not line.startswith("#"), lines)
         ips = map(lambda line: validate_ip(line.split("#")[0]), lines)
@@ -44,7 +45,8 @@ def compare_with_blacklist(active_ips: set[str], error_ips: set[str],
         # - différence : IP actives absentes de la liste noire
         "actives_non_listees": active_ips - blacklist,
         # - différence : IP listées jamais vues (liste peut-être obsolète)
-        "blacklist_dormantes": blacklist - active_ips,
+        # (frozenset - set donne un frozenset : on le convertit en set)
+        "blacklist_dormantes": set(blacklist - active_ips),
         # ^ différence symétrique : dans l'un OU l'autre, mais pas les deux
         "difference_symetrique": active_ips ^ blacklist,
     }
@@ -86,8 +88,11 @@ class LogStatistics:
         self.latency: defaultdict[str, list[float]] = \
             defaultdict(lambda: [0, 0.0, 0.0])
         self.latency_buckets: defaultdict[str, int] = defaultdict(int)
-        # ip -> ensemble des ports de destination bloqués par le pare-feu
-        self.dropped_ports: defaultdict[str, set[int]] = defaultdict(set)
+        self.by_protocol: defaultdict[str, int] = defaultdict(int)
+        # (IP source, port de destination, protocole) -> nombre de blocages.
+        # Un tuple peut servir de clé de dictionnaire car il est immuable
+        # (donc "hashable") ; une liste ne le pourrait pas.
+        self.blocked_flows: defaultdict[Connection, int] = defaultdict(int)
         self.error_ips: set[str] = set()
         self.first_seen: datetime | None = None
         self.last_seen: datetime | None = None
@@ -113,6 +118,9 @@ class LogStatistics:
         self.levels_by_service[service][level] += 1
         if record["user"]:
             self.by_user[record["user"]] += 1
+        # Déballage du tuple de connexion (IP, Port, Protocole)
+        ip, _source_port, protocol = record["connection"]
+        self.by_protocol[protocol] += 1
         if self.first_seen is None or moment < self.first_seen:
             self.first_seen = moment
         if self.last_seen is None or moment > self.last_seen:
@@ -132,7 +140,8 @@ class LogStatistics:
             case {"status": int(status)} | {"code": int(status)}:
                 self.by_status[status] += 1
             case {"action": "DROP", "dst_port": int(port)}:
-                self.dropped_ports[record["ip"]].add(port)
+                # nouveau tuple : la cible visée (port de destination)
+                self.blocked_flows[(ip, port, protocol)] += 1
 
     def _add_latency(self, service: str, ms: float) -> None:
         stats = self.latency[service]
@@ -149,8 +158,15 @@ class LogStatistics:
             self.latency_buckets[f"> {LATENCY_BUCKETS[-1]} ms"] += 1
 
     def port_scanners(self, min_ports: int = 15) -> dict[str, int]:
-        """IP qui ont tenté beaucoup de ports différents (scan de ports)."""
-        return {ip: len(ports) for ip, ports in self.dropped_ports.items()
+        """IP qui ont tenté beaucoup de ports différents (scan de ports).
+
+        On parcourt les clés de ``blocked_flows`` : chaque clé est un tuple
+        qu'on déballe directement dans la boucle for.
+        """
+        ports_by_ip: defaultdict[str, set[int]] = defaultdict(set)
+        for ip, port, _protocol in self.blocked_flows:
+            ports_by_ip[ip].add(port)
+        return {ip: len(ports) for ip, ports in ports_by_ip.items()
                 if len(ports) >= min_ports}
 
     def summary(self) -> dict[str, Any]:
@@ -183,6 +199,13 @@ class LogStatistics:
             "nb_utilisateurs_uniques": len(self.by_user),
             "nb_ip_en_erreur": len(self.error_ips),
             "scans_de_ports": dict(top(self.port_scanners(), 30)),
+            "par_protocole": dict(self.by_protocol),
+            "nb_flux_bloques_distincts": len(self.blocked_flows),
+            "top_flux_bloques": [
+                {"ip": ip, "port": port, "protocole": protocol,
+                 "blocages": count}
+                for (ip, port, protocol), count in top(self.blocked_flows,
+                                                       15)],
             "chronologie_par_heure": {
                 h.isoformat(): n for h, n in sorted(self.timeline.items())},
             "erreurs_par_heure": {

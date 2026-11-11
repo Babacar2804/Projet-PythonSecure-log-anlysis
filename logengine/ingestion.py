@@ -5,6 +5,7 @@ générateur qui fournit UNE ligne à la fois, uniquement quand la boucle
 suivante la demande.
 """
 
+import os
 import sys
 import time
 from collections.abc import Iterable, Iterator
@@ -42,6 +43,36 @@ def read_sources(paths: Iterable[Path]) -> Iterator[str]:
         except (FileNotFoundError, PermissionError) as exc:
             print(f"[ingestion] fichier ignoré ({exc.__class__.__name__}) : "
                   f"{path}", file=sys.stderr)
+
+
+def follow_log_file(path: Path, poll_interval: float = 0.2,
+                    stop_after: float | None = None,
+                    from_start: bool = False) -> Iterator[str]:
+    """Suit un fichier qui grossit en temps réel (comme ``tail -f``).
+
+    C'est un générateur infini : quand il n'y a pas de nouvelle ligne, il
+    attend un peu (``time.sleep``) puis réessaie, au lieu de s'arrêter.
+    ``stop_after`` (en secondes) permet d'arrêter le suivi proprement.
+
+    Une ligne en cours d'écriture peut arriver en morceaux : on accumule
+    dans ``pending`` jusqu'au "\\n" final pour ne jamais livrer une moitié
+    de ligne au parseur.
+    """
+    deadline = None if stop_after is None else time.monotonic() + stop_after
+    with open(path, encoding="utf-8", errors="replace", newline="") as file:
+        if not from_start:
+            file.seek(0, os.SEEK_END)       # seulement les nouvelles lignes
+        pending = ""
+        while deadline is None or time.monotonic() < deadline:
+            chunk = file.readline()
+            if not chunk:                   # rien de nouveau pour l'instant
+                time.sleep(poll_interval)
+                continue
+            pending += chunk
+            if not pending.endswith("\n"):  # ligne pas encore terminée
+                continue
+            yield pending
+            pending = ""
 
 
 def with_progress(lines: Iterable[str],
