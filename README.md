@@ -14,8 +14,10 @@ pip install -r requirements.txt
 
 Python 3.10 minimum (le code utilise `match` / `case`).
 
-Si vous ajoutez une bibliothèque, régénérez le fichier :
-`pip freeze > requirements.txt`.
+Les dépendances directes sont déclarées dans `requirements.txt`. Ajoutez-y
+les bibliothèques nécessaires au projet ; évitez d'y recopier `pip freeze`,
+qui épingle aussi les dépendances indirectes et peut empêcher l'installation
+sur Python 3.10.
 
 ## Utilisation
 
