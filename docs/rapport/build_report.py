@@ -36,10 +36,10 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # ---------------------------------------------------------------------------
 # À COMPLÉTER PAR L'ÉQUIPE, puis relancer le script
-TEAM = ["Prénom NOM 1", "Prénom NOM 2", "Prénom NOM 3", "Prénom NOM 4"]
+TEAM = ["NAYME Yanis", "GUEYE Babacar Mansour", "CLABAU Brandon", "LYOUBI Mehdi"]
 SCHOOL = "Niveau ING3"
-TEACHER = "Enseignant : à compléter"
-GITHUB_URL = "https://github.com/votre-compte/votre-depot"
+TEACHER = "Enseignant : JOUD HANAY"
+GITHUB_URL = "https://github.com/Babacar2804/Projet-PythonSecure-log-anlysis"
 # Mesures faites avec `python main.py analyze --trace-memory --limit N`
 MEMORY_MEASURES = [(290_699, 12.5), (2_000_000, 16.1)]
 # ---------------------------------------------------------------------------
