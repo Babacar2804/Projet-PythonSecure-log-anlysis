@@ -77,7 +77,6 @@ logengine/
     audit.py             Module 4 : globals() / locals()
     report.py            exports JSON / CSV / PNG
 tests/                   tests pytest (un fichier par module)
-docs/EXPLICATIONS.md     explication détaillée pour la soutenance
 ```
 
 ## Rapport PDF
