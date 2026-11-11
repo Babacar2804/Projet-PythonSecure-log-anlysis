@@ -9,8 +9,9 @@ data/live/
 output/
 docs/rapport/_figures/
 
-# Notes de préparation de la soutenance (gardées en local uniquement)
+# Notes de préparation et rapport complet (gardés en local uniquement)
 docs/EXPLICATIONS.md
+docs/rapport/Rapport_projet_logs.pdf
 
 # Python
 __pycache__/
